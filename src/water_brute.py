@@ -3,7 +3,6 @@ import mdtraj as md
 import numpy as np
 import itertools
 from time import time
-from pyxutils import mult
 
 def get_atom_distances(traj):
     """
@@ -95,49 +94,43 @@ def get_features_distances(atom_distances, atom_pairs, top_or_traj, atom_types=N
 
     all_combos = []
     sigma_sqr = 0.05 ** 2 # radius of an atom in nm
-    C = 1. / (sigma_sqr)
-    E = np.exp(- C * atom_distances)
-    diag_ind = np.arange(E.shape[1])
-    E[:, diag_ind, diag_ind] = 0.0
-    for i in xrange(n_terms):
-        # remove the diagonal so we don't count self distances
-        k = i + 2 # first term is the two-body term
+    for k in xrange(2, n_terms + 1):
+        C = 0.25 / (k**2) / (sigma_sqr)
+        E = np.exp(- C * atom_distances)
+        print "C=%f" % C
         combos = itertools.combinations_with_replacement(unique_atoms, k)
         # get k atom types
         current_features = []
         for c in combos:
             print "Working on types %s" % str(c)
-            current_mat = np.zeros(E.shape)
-            current_mat[:] = np.eye(E.shape[1])
-            for j in range(len(c) - 1):
-                t0 = time()
-                temp = np.zeros(E.shape)
-                type1 = np.where(atom_types==c[j])[0]
-                type2 = np.where(atom_types==c[j + 1])[0]
-                # need to only include distances associated with these pairs of points
-                t1 = time()
+            # c is a tuple containing combinations of atom types
+            # but we need to sum over a bunch of atom indices
+            a = time()
+            temp = itertools.product(*[atom_lists[i] for i in c])
 
-                print "setup: %f" % (t1 - t0)
-                all_ind = np.array(list(itertools.product(type1, type2)))
-                t2 = time()
+            running_sum = 0.0
+            for i in temp:
+                if len(i) != len(np.unique(i)):
+                    continue
 
-                print "iter: %f" % (t2 - t1)
-                temp[:, all_ind[:,0], all_ind[:,1]] = E[:, all_ind[:, 0], all_ind[:, 1]]
-                temp[:, diag_ind, diag_ind] = 0.0
-                t3 = time()
-                print "set: %f" % (t3 - t2)
+                pairs = np.array(list(itertools.combinations(i, 2)))
 
-                mult(current_mat, temp)
-                #for l in xrange(current_mat.shape[0]):
-                #    current_mat[l] = current_mat[l].dot(temp[l])
-                t4 = time()
-                print "multiply: %f" % (t4 - t3)
+                running_sum += np.product(E[:, pairs[:, 0], pairs[:, 1]], axis=1)
+                
+            #zipped_atom_pairs = np.concatenate([list(itertools.combinations(i, 2)) for i in temp if len(i) == len(np.unique(i))])
+            b = time()
+            print "finish: %.4f" % (b - a)
+            #temp_exp_terms = np.exp(- C * atom_distances[:, zipped_atom_pairs[:, 0], zipped_atom_pairs[:, 1]])
+            #print "exponentiate: %.4f" % (c - b)
+            #temp_exp_terms = temp_exp_terms.reshape((len(atom_distances), -1, k))
+            #d = time()
+            #print "reshape: %.4f" % (d - c)
+            #feature = np.product(temp_exp_terms, axis=2).sum(axis=1)
+            feature = running_sum
 
-            current_mat[:, diag_ind, diag_ind] = 0.0
-            features.append(current_mat.sum(2).sum(1))
+            features.append(np.float(feature))
             all_combos.append(c)
-
-            print features[-1]
+            e = time()
 
     return features, all_combos
 
