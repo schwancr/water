@@ -99,6 +99,7 @@ def get_features_distances(atom_distances, atom_pairs, top_or_traj, atom_types=N
     E = np.exp(- C * atom_distances)
     diag_ind = np.arange(E.shape[1])
     E[:, diag_ind, diag_ind] = 0.0
+    temp = np.zeros(E.shape)
     for i in xrange(n_terms):
         # remove the diagonal so we don't count self distances
         k = i + 2 # first term is the two-body term
@@ -111,7 +112,7 @@ def get_features_distances(atom_distances, atom_pairs, top_or_traj, atom_types=N
             current_mat[:] = np.eye(E.shape[1])
             for j in range(len(c) - 1):
                 t0 = time()
-                temp = np.zeros(E.shape)
+                temp *= 0.0 # reset the temp container
                 type1 = np.where(atom_types==c[j])[0]
                 type2 = np.where(atom_types==c[j + 1])[0]
                 # need to only include distances associated with these pairs of points
@@ -136,8 +137,6 @@ def get_features_distances(atom_distances, atom_pairs, top_or_traj, atom_types=N
             current_mat[:, diag_ind, diag_ind] = 0.0
             features.append(current_mat.sum(2).sum(1))
             all_combos.append(c)
-
-            print features[-1]
 
     return features, all_combos
 
