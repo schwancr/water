@@ -1,5 +1,6 @@
 
 import mdtraj as md
+import scipy.special
 import numpy as np
 cimport numpy as np
 cimport cython
@@ -11,8 +12,8 @@ DTYPE_INT = np.int
 ctypedef np.int_t DTYPE_INT_t
 ctypedef np.float_t DTYPE_FLOAT_t
 
-def get_features_distances(np.ndarray[DTYPE_FLOAT_t, ndims=2] atom_distances, 
-                           np.ndarray[DTYPE_INT_t, ndims=1] atom_types, 
+def get_features_distances(np.ndarray[DTYPE_FLOAT_t, ndim=3] atom_distances, 
+                           np.ndarray[DTYPE_INT_t, ndim=1] atom_types, 
                            int n_terms):
     """
     compute the features of the trajectories by computing the overlap integrals
@@ -69,56 +70,57 @@ def get_features_distances(np.ndarray[DTYPE_FLOAT_t, ndims=2] atom_distances,
     cdef unsigned int max_natoms = np.max(np.bincount(atom_types))
     cdef unsigned int k
     cdef unsigned int L
+    cdef unsigned int feature_ind = 0
     cdef float C
-    cdef np.ndarray[DTYPE_FLOAT_t, ndims=2] E
-    cdef np.ndarray[DTYPE_INT_t, ndims=1] unique_atoms = np.arange(atom_distances.shape[0], dtype=DTYPE_INT)
-    cdef np.ndarray[DTYPE_INT_t, ndims=2] atom_lists = -1 * np.ones((num_types, max_natoms), dtype=DTYPE_INT)
-    cdef np.ndarray[DTYPE_INT_t, ndims=2] all_combos = -1 * np.ones((num_features, n_terms), dtype=DTYPE_INT)
-    cdef np.ndarray[DTYPE_FLOAT_t, ndims=1] features = -1 * np.ones(num_features, dtype=DTYPE_FLOAT)
-    # first populate the atom_lists
+    cdef np.ndarray[DTYPE_FLOAT_t, ndim=3] E = np.empty_like(atom_distances)
+    cdef np.ndarray[DTYPE_INT_t, ndim=1] unique_atoms = np.arange(num_types, dtype=DTYPE_INT)
+    cdef unsigned int num_features = np.sum([len(list(itertools.combinations_with_replacement(unique_atoms, k))) for k in xrange(2, 2 + n_terms)])
+    cdef np.ndarray[DTYPE_INT_t, ndim=2] atom_lists = -1 * np.ones((num_types, max_natoms), dtype=DTYPE_INT)
+    cdef np.ndarray[DTYPE_INT_t, ndim=2] all_combos = -1 * np.ones((num_features, n_terms), dtype=DTYPE_INT)
+    cdef np.ndarray[DTYPE_FLOAT_t, ndim=2] features = np.zeros((atom_distances.shape[0], num_features), dtype=DTYPE_FLOAT)
 
+    print num_features, (features.shape[0], features.shape[1])
+
+    # first populate the atom_lists
     for k in range(num_types):
         L = np.where(atom_types == k)[0].shape[0]
         atom_lists[k, :L] = np.where(atom_types == k)[0]
 
     sigma_sqr = 0.05 ** 2 # radius of an atom in nm
-    for k in range(2, n_terms + 1):
+    feature_ind = 0
+    for k in range(2, n_terms + 2):
         C = 0.25 / (k**2) / (sigma_sqr)
         E = np.exp(- C * atom_distances)
         print "C=%f" % C
         combos = itertools.combinations_with_replacement(unique_atoms, k)
         # get k atom types
-        current_features = []
         for c in combos:
             print "Working on types %s" % str(c)
             # c is a tuple containing combinations of atom types
             # but we need to sum over a bunch of atom indices
             a = time()
-            temp = itertools.product(*[atom_lists[i] for i in c])
 
-            running_sum = 0.0
-            for i in temp:
-                if len(i) != len(np.unique(i)):
+            for atom_inds in itertools.product(*[atom_lists[i] for i in c]):
+                if len(atom_inds) != len(set(atom_inds)):
                     continue
+                # atom_inds is a set of k atom indices
+                # we need to look through all possible combinations of these atoms
+                if k == 2:
+                    features[:, feature_ind] += E[:, atom_inds[0], atom_inds[1]]
 
-                pairs = np.array(list(itertools.combinations(i, 2)))
+                elif k == 3:
+                    features[:, feature_ind] += E[:, atom_inds[0], atom_inds[1]] * E[:, atom_inds[0], atom_inds[2]] * E[:, atom_inds[1], atom_inds[2]]
 
-                running_sum += np.product(E[:, pairs[:, 0], pairs[:, 1]], axis=1)
+                else:
+                    pairs = np.array(list(itertools.combinations(atom_inds, 2)))
+                    features[:, feature_ind] += np.product(E[:, pairs[:, 0], pairs[:, 1]], axis=1)
+
+            all_combos[feature_ind, :len(c)] = c
+
+            feature_ind += 1
                 
-            #zipped_atom_pairs = np.concatenate([list(itertools.combinations(i, 2)) for i in temp if len(i) == len(np.unique(i))])
             b = time()
             print "finish: %.4f" % (b - a)
-            #temp_exp_terms = np.exp(- C * atom_distances[:, zipped_atom_pairs[:, 0], zipped_atom_pairs[:, 1]])
-            #print "exponentiate: %.4f" % (c - b)
-            #temp_exp_terms = temp_exp_terms.reshape((len(atom_distances), -1, k))
-            #d = time()
-            #print "reshape: %.4f" % (d - c)
-            #feature = np.product(temp_exp_terms, axis=2).sum(axis=1)
-            feature = running_sum
-
-            features.append(np.float(feature))
-            all_combos.append(c)
-            e = time()
 
     return features, all_combos
 
