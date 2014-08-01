@@ -1,0 +1,60 @@
+\documentclass[journal=jctcce, manuscript=article]{achemso}
+%\usepackage[utf8]{inputenc}
+
+\usepackage{amsmath}    % need for subequations
+\usepackage{amssymb}    % for symbols
+
+\usepackage[capitalise]{cleveref}   % use for referencing figures/equations
+
+\usepackage{color}      % use if color is used in text
+\usepackage{soul}
+\usepackage{graphicx}
+
+\newcommand{\bra}[1]{\ensuremath{\left\langle#1\right|}}
+\newcommand{\ket}[1]{\ensuremath{\left|#1\right\rangle}}
+\newcommand{\braket}[2]{\ensuremath{\left\langle#1\right|\left.#2\right\rangle}}
+
+\title{Featurization for Indistinguishable Atoms}
+\author{Christian R. Schwantes}
+\affiliation{Department of Chemistry, Stanford University, Stanford, CA 94305}
+
+\begin{document}
+
+What is the overlap integral between $k$ Gaussian density functions, each with the same variance, $\sigma^2$, but different means: $\{\mu_i\}_{i=1}^k$? Then overlap is given by:
+
+\begin{align}
+S_k &= \int d\mathbf{x}\prod_{i=1}^k \left[\frac{1}{(2\pi \sigma^2)^\frac{d}{2}} \exp\left(- \frac{|\mathbf{x} - \mu_i|^2}{2 \sigma^2} \right) \right] \\
+	&= \frac{1}{(2 \pi \sigma^2)^\frac{dk}{2}} \int d\mathbf{x} \exp\left(- \frac{1}{2\sigma^2} \sum_{i=1}^k |\mathbf{x} - \mu_i|^2\right)
+\end{align} The product of many Gaussians is itself a Gaussian function, so we need only complete the square to find the new Gaussian:
+
+\begin{align*}
+\sum_{i=1}^k |\mathbf{x} - \mu_i|^2 &= \sum_{i=1}^k \mathbf{x}^T \mathbf{x} - 2 \mathbf{x}^T \mu_i + \mu_i^T \mu_i \\
+	&= k \mathbf{x}^T \mathbf{x} - 2 \mathbf{x}^T \left(\sum_{i=1}^k \mu_i\right) + \sum_{i=1}^k \mu_i^T \mu_i 
+\end{align*} Let $\mathbf{m} = \frac{1}{k}\sum_{i=1}^k \mu_i$, then we can complete the square in terms of this vector:
+\begin{align*}
+\sum_{i=1}^k |\mathbf{x} - \mu_i|^2 &= k\left( \mathbf{x}^T \mathbf{x} - 2 \mathbf{x}^T \mathbf{m} + \frac{\sum_{i=1}^k \mu_i^T \mu_i}{k} \right) \\
+	&= k\left( \mathbf{x}^T \mathbf{x} - 2 \mathbf{x}^T \mathbf{m} + (- \mathbf{m}^T \mathbf{m}) - (-\mathbf{m}^T\mathbf{m}) + \frac{\sum_{i=1}^k \mu_i^T \mu_i}{k} \right) \\
+	&= k|\mathbf{x} - \mathbf{m}|^2 + k \frac{\sum_{i=1}^k \mu_i^T \mu_i}{k} - k \mathbf{m}^T \mathbf{m}
+\end{align*} With, this we can rewrite the integral for calculating $S_k$:
+\begin{align}
+S_k &= \frac{1}{(2 \pi \sigma^2)^\frac{dk}{2}} \int d\mathbf{x} \exp\left(- \frac{1}{2\sigma^2} \sum_{i=1}^k |\mathbf{x} - \mu_i|^2\right) \\
+	&= \frac{1}{(2 \pi \sigma^2)^\frac{dk}{2}} \int d\mathbf{x} \exp\left(- \frac{1}{2} \frac{|\mathbf{x} - \mathbf{m}|^2}{ \sigma^2 / k}\right) \exp\left(- \frac{\sum_{i=1}^k \mu_i^T\mu_i - k \mathbf{m}^T \mathbf{m}}{2 \sigma^2}\right) \\
+	&= \frac{1}{(2 \pi \sigma^2)^\frac{dk}{2}} (2 \pi(\sigma^2 / k))^\frac{d}{2} \exp\left(- \frac{\sum_{i=1}^k \mu_i^T\mu_i - k \mathbf{m}^T \mathbf{m}}{2 \sigma^2}\right) \\
+	&= (2\pi \sigma^2)^{- \frac{d (k - 1)}{2}} k^{-\frac{d}{2}} \exp\left(- \frac{\sum_{i=1}^k \mu_i^T\mu_i - k \mathbf{m}^T \mathbf{m}}{2 \sigma^2}\right) \\
+		&= (2\pi \sigma^2)^{- \frac{d (k - 1)}{2}} k^{-\frac{d}{2}} \exp\left(- \frac{\frac{1}{k}\sum_{i=1}^k \mu_i^T\mu_i - \mathbf{m}^T \mathbf{m}}{2 \sigma^2 / k}\right) \\
+\end{align} The numerator in the exponential can be written in terms of the variance of the means.
+
+\begin{align}
+\frac{1}{k}\sum_{i=1}^k \mu_i^T \mu_i - \mathbf{m}^T \mathbf{m} &= \frac{1}{k} \sum_{i=1}^k (\mu_i^T \mu_i) - \mathbf{m}^T\mathbf{m} \\
+	&= \sum_{j=1}^d \left(\frac{1}{k} \sum_{i=1}^k (\mu_i)_j(\mu_i)_j\right) - m_j^2 \\
+	&= \sum_{j=1}^d {\rm var}\Big((\mu_i)_j\Big) \\
+	&= \sum_{j=1}^d \frac{1}{2k^2} \sum_{a=1}^k \sum_{b=1}^k \Big((\mu_a)_j - (\mu_b)_j\Big)^2 \\
+	&= \frac{1}{k^2} \sum_{a=1}^k \sum_{b>a}^k |\mu_a - \mu_b|^2
+\end{align} And so the overlap integral can be written as:
+
+\begin{align}
+S_k &= (2\pi \sigma^2)^{- \frac{d (k - 1)}{2}} k^{-\frac{d}{2}} \exp\left(- \frac{\frac{1}{k}\sum_{i=1}^k \mu_i^T\mu_i - \mathbf{m}^T \mathbf{m}}{2 \sigma^2 / k}\right) \\
+	&= (2\pi \sigma^2)^{- \frac{d (k - 1)}{2}} k^{-\frac{d}{2}} \exp\left(- \frac{\frac{1}{k^2} \sum_{a=1}^k \sum_{b>a}^k |\mu_a - \mu_b|^2}{2 \sigma^2 / k}\right) \\
+	&= (2\pi \sigma^2)^{- \frac{d (k - 1)}{2}} k^{-\frac{d}{2}} \exp\left(- \frac{1}{2 k\sigma^2} \sum_{a=1}^k \sum_{b>a}^k |\mu_a - \mu_b|^2\right) \\
+\end{align} This is the overlap
+\end{document}
