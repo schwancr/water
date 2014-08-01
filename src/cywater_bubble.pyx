@@ -12,7 +12,7 @@ DTYPE_INT = np.int
 ctypedef np.int_t DTYPE_INT_t
 ctypedef np.float_t DTYPE_FLOAT_t
 
-def get_features_distances(np.ndarray[DTYPE_FLOAT_t, ndim=3] atom_distances, 
+def get_features_distances(np.ndarray[DTYPE_FLOAT_t, ndim=2] atom_distances, 
                            np.ndarray[DTYPE_INT_t, ndim=1] atom_types, 
                            int n_terms):
     """
@@ -86,27 +86,32 @@ def get_features_distances(np.ndarray[DTYPE_FLOAT_t, ndim=3] atom_distances,
 
     sigma_sqr = 0.05 ** 2 # radius of an atom in nm
     feature_ind = 0
-    for k in range(2, n_terms + 2):
-        C = 0.5 / k / (sigma_sqr)
-        E = np.exp(- C * atom_distances)
-        #print "C=%f" % C
-        combos = list(itertools.combinations_with_replacement(unique_atoms, k))
-        # get k atom types
-        for c in combos:
-            #print "Working on types %s" % str(c)
-            # c is a tuple containing combinations of atom types
-            # but we need to sum over a bunch of atom indices
-            a = time()
 
-            for atom_inds in itertools.product(*[atom_lists[i] for i in c]):
-                if len(atom_inds) != len(set(atom_inds)):
-                    continue
-                # atom_inds is a set of k atom indices
-                # we need to look through all possible combinations of these atoms
-                if k == 2:
-                    features[:, feature_ind] += E[:, atom_inds[0], atom_inds[1]]
+    for aind in xrange(n_atoms):
+        neighbors = np.where(atom_distances[aind] < epsilon)[0]
 
-                elif k == 3:
+        for k in range(2, n_terms + 2):
+            C = 0.5 / k / sigma_sqr
+            E = np.exp(- C * atom_distances[neighbors, :][:, neighbors])
+
+            combos = list(itertools.combinations_with_replacement(unique_atoms, k))
+            # get k atom types
+            for c in combos:
+                #print "Working on types %s" % str(c)
+                # c is a tuple containing combinations of atom types
+                # but we need to sum over a bunch of atom indices
+                a = time()
+
+                if c[0]
+                for atom_inds in itertools.product(*[atom_lists[i] for i in c]):
+                    if len(atom_inds) != len(set(atom_inds)):
+                        continue
+                    # atom_inds is a set of k atom indices
+                    # we need to look through all possible combinations of these atoms
+                    if k == 2:
+                        features[:, feature_ind] += E[:, atom_inds[0], atom_inds[1]]
+
+                    elif k == 3:
                     features[:, feature_ind] += E[:, atom_inds[0], atom_inds[1]] * E[:, atom_inds[0], atom_inds[2]] * E[:, atom_inds[1], atom_inds[2]]
 
                 else:
