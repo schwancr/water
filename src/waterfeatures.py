@@ -157,7 +157,7 @@ class OOH(BaseEstimator, TransformerMixin):
                 increasing distance. The Hydrogens are then
                 disassociated from their water atom 
     """
-    def __init__(self, n_waters=None, sortH='local'):
+    def __init__(self, n_waters=None, sortH='local', remove_selfH=False):
         if n_waters is None:
             self.n_waters = n_waters
         else:
@@ -169,6 +169,8 @@ class OOH(BaseEstimator, TransformerMixin):
         self.sort_locally = False
         if sortH.lower() == 'local':
             self.sort_locally = True
+
+        self.remove_selfH = bool(remove_selfH)
 
     def transform(self, traj):
         """
@@ -198,21 +200,25 @@ class OOH(BaseEstimator, TransformerMixin):
         else:
             n_waters = self.n_waters
 
+        x = 0
+        if self.remove_selfH:
+            x = 1
         OHdistances = []
         for frame_ind in xrange(traj.n_frames):
             # compute H's based on closest n oxygens
             OHpairs = []
             for Oind in xrange(n_oxygens):
-                water_inds = [traj.top.atom(i).residue.index for i in np.argsort(OOdistances[frame_ind, Oind])[:(n_waters + 1)]]
+                water_inds = [traj.top.atom(i).residue.index for i in np.argsort(OOdistances[frame_ind, Oind])[x:(n_waters + 1)]]
                 # NOTE: This will include the hydrogens on the same molecule as well
 
                 OHpairs.extend([(Oind, a.index) for i in water_inds 
                                     for a in traj.top.residue(i).atoms if a.element.symbol == 'H'])
 
-            tempD = md.compute_distances(traj[frame_ind], OHpairs).reshape((1, n_oxygens, 2 * (n_waters + 1)))
+            tempD = md.compute_distances(traj[frame_ind], OHpairs).reshape((1, n_oxygens, 2 * (n_waters + 1 - x)))
 
             if self.sort_locally:
                 # ugh.
+                # this might not work with the remove_selfH stuff.
                 d = np.array([np.concatenate([np.sort(tempD[0, oind, i:i+2]) for i in xrange(0, 2 * n_oxygens, 2)]) for oind in xrange(n_oxygens)])
                 OHdistances.append(d)
             else:
