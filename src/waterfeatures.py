@@ -6,6 +6,7 @@ import copy
 from simtk.openmm import app
 from simtk import openmm as mm
 from simtk import unit
+import time
 
 
 def get_square_distances(traj, aind=None):
@@ -475,6 +476,7 @@ class InducedDipole(BaseEstimator, TransformerMixin):
         #        hydrogens.append(temp)
         #hydrogens = np.array(hydrogens)
 
+        a = time.time()
         distances = get_square_distances(traj, oxygens)
 
         Xnew = copy.copy(distances)
@@ -487,29 +489,84 @@ class InducedDipole(BaseEstimator, TransformerMixin):
             Xnew = Xnew[:, :, 1:(self.n_waters + 1)]
             n_waters = self.n_waters
 
+        b = time.time()
+        distance_time = b - a
+
+        induced_time = 0
+        rotate_time = 0
+
         # this is probably pretty slow ... 
-        dipoles = []
+        alldipoles = []
         for i in xrange(traj.n_frames):
+            a = time.time()
+            dipoles = []
             pos = traj.xyz[i]
             box = traj.unitcell_vectors[i]
             self._context.setPeriodicBoxVectors(box[0], box[1], box[2])
             self._context.setPositions(pos)
 
-            dipoles.append(self._amoeba_force.getInducedDipoles(self._context))
+            induced = self._amoeba_force.getInducedDipoles(self._context)
 
-        dipoles = np.array(dipoles)
+            b = time.time()
+
+            for ai in xrange(traj.n_atoms):
+                params = self._amoeba_force.getMultipoleParameters(ai)
+
+                molec_dipole = np.array(params[1])
+                atomZ = params[4]
+                atomX = params[5]
+
+                posX = traj.xyz[i, atomX]
+                posZ = traj.xyz[i, atomZ]
+                
+                myPos = traj.xyz[i, ai]
+
+                Z = posZ - myPos
+                X = posX - myPos
+
+                Z /= np.sqrt(np.square(Z).sum())
+                X /= np.sqrt(np.square(X).sum())
+
+                Z = Z + X
+                Z /= np.sqrt(np.square(Z).sum())
+                
+                X = X - X.dot(Z) * Z
+                X /= np.sqrt(np.square(X).sum())
+
+                Y = np.cross(Z, X)
+
+                lab_dipole = molec_dipole.dot(np.vstack([X, Y, Z]))
+
+                dipoles.append(lab_dipole + induced[ai])
+
+            c = time.time()
+
+            induced_time += b - a
+            rotate_time += c - b
+
+            alldipoles.append(dipoles)
+
+        dipoles = np.array(alldipoles)
+        print dipoles.shape
         # add the dipoles for each atom
         dipoles = dipoles[:, ::3] + dipoles[:, 1::3] + dipoles[:, 2::3]
 
+        a = time.time()
         dipole_dots = []
         for frame_ind in xrange(traj.n_frames):
             temp = []
             for water in xrange(len(oxygens)):
                 water_inds = np.argsort(distances[frame_ind, water])[1:(n_waters + 1)]
                 temp.append(np.dot(dipoles[frame_ind, water], dipoles[frame_ind, water_inds].T))
+                print temp[-1]
             dipole_dots.append(temp)
 
         dipole_dots = np.array(dipole_dots)
         Xnew = np.concatenate([Xnew, dipole_dots], axis=2)
 
+        b = time.time()
+
+        print "distances : %.2f | induced dipoles : %.2f | rotate frame : %.2f | dot products : %.2f" % (distance_time, induced_time, rotate_time, b - a)
+
         return Xnew, distances
+
