@@ -3,6 +3,9 @@ import numpy as np
 import mdtraj as md
 from sklearn.base import TransformerMixin, BaseEstimator
 import copy
+from simtk.openmm import app
+from simtk import openmm as mm
+from simtk import unit
 
 
 def get_square_distances(traj, aind=None):
@@ -391,6 +394,112 @@ class Dipole(BaseEstimator, TransformerMixin):
 
         dipoles = traj.xyz[:, oxygens, :] - np.mean(traj.xyz[:, hydrogens, :], axis=2)
         dipoles /= np.sqrt(np.square(dipoles).sum(2, keepdims=True)) # make them unit vectors
+
+        dipole_dots = []
+        for frame_ind in xrange(traj.n_frames):
+            temp = []
+            for water in xrange(len(oxygens)):
+                water_inds = np.argsort(distances[frame_ind, water])[1:(n_waters + 1)]
+                temp.append(np.dot(dipoles[frame_ind, water], dipoles[frame_ind, water_inds].T))
+            dipole_dots.append(temp)
+
+        dipole_dots = np.array(dipole_dots)
+        Xnew = np.concatenate([Xnew, dipole_dots], axis=2)
+
+        return Xnew, distances
+
+
+class InducedDipole(BaseEstimator, TransformerMixin):
+    """
+    Compute the OO distances and sort them for each water molecule
+    Then compute the induced dipole on neighboring waters, and 
+    compute the dot product between the central molecules induced
+    dipole and its neighbors
+    
+    Parameters
+    ----------
+    n_waters : int, optional
+        Limit the feature vectors to the closest n_waters. If None, 
+        then all waters are included.
+    """
+    def __init__(self, n_waters=None, topology=None):
+
+        if hasattr(topology, 'to_openmm'):
+            self._top = topology.to_openmm()
+        else:
+            self._top = topology
+
+        if n_waters is None:
+            self.n_waters = n_waters
+        else:
+            self.n_waters = int(n_waters)
+
+        forcefield = app.ForceField('iamoeba.xml')
+
+        self._top.setUnitCellDimensions([10, 10, 10])
+        system = forcefield.createSystem(self._top, nonbondedMethod=app.PME)
+        self._amoeba_force = [f for f in system.getForces() if isinstance(f, mm.openmm.AmoebaMultipoleForce)][0]
+        integrator = mm.LangevinIntegrator(3000*unit.kelvin, 1.0/unit.picoseconds, 2.0*unit.femtoseconds)
+        platform = mm.Platform.getPlatformByName('Reference')
+
+        self._sim = app.Simulation(self._top, system, integrator, platform)
+        self._context = self._sim.context
+
+
+    def transform(self, traj):
+        """
+        Transform a trajectory into the dipole features
+
+        Parameters
+        ----------
+        traj : mdtraj.Trajectory
+
+        Returns
+        -------
+        Xnew : np.ndarray
+            sorted distances for each water molecule
+        distances : np.ndarray
+            distances between each water molecule
+        """
+        oxygens = np.array([i for i in xrange(traj.n_atoms) if traj.top.atom(i).element.symbol == 'O'])
+        
+        hydrogens = np.array([[a.index for a in traj.top.atom(Oind).residue.atoms if a.element.symbol == 'H'] for Oind in oxygens])
+        # this ^^^ is the same as that vvv
+        #hydrogens = []
+        #for Oind in oxygens:
+        #    res = traj.top.atom(Oind).residue
+        #    for atom in res.atoms:
+        #        temp = []
+        #        if atom.element.symbol == 'H':
+        #            temp.append(atom.index)
+        #        hydrogens.append(temp)
+        #hydrogens = np.array(hydrogens)
+
+        distances = get_square_distances(traj, oxygens)
+
+        Xnew = copy.copy(distances)
+        Xnew.sort()
+
+        if self.n_waters is None:
+            Xnew = Xnew[:, :, 1:]
+            n_waters = len(oxygens) - 1
+        else:
+            Xnew = Xnew[:, :, 1:(self.n_waters + 1)]
+            n_waters = self.n_waters
+
+        # this is probably pretty slow ... 
+        dipoles = []
+        for i in xrange(traj.n_frames):
+            pos = traj.xyz[i]
+            box = traj.unitcell_vectors[i]
+            self._context.setPeriodicBoxVectors(box[0], box[1], box[2])
+            self._context.setPositions(pos)
+
+            dipoles.append(self._amoeba_force.getInducedDipoles(self._context))
+
+        dipoles = np.array(dipoles)
+        # add the dipoles for each atom
+        dipoles = dipoles[:, ::3] + dipoles[:, 1::3] + dipoles[:, 2::3]
 
         dipole_dots = []
         for frame_ind in xrange(traj.n_frames):
