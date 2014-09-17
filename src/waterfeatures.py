@@ -438,7 +438,7 @@ class InducedDipole(BaseEstimator, TransformerMixin):
         forcefield = app.ForceField('iamoeba.xml')
 
         self._top.setUnitCellDimensions([10, 10, 10])
-        system = forcefield.createSystem(self._top, nonbondedMethod=app.PME)
+        system = forcefield.createSystem(self._top, nonbondedMethod=app.PME, polarization='direct')
         self._amoeba_force = [f for f in system.getForces() if isinstance(f, mm.openmm.AmoebaMultipoleForce)][0]
         integrator = mm.LangevinIntegrator(3000*unit.kelvin, 1.0/unit.picoseconds, 2.0*unit.femtoseconds)
         platform = mm.Platform.getPlatformByName('Reference')
@@ -553,20 +553,36 @@ class InducedDipole(BaseEstimator, TransformerMixin):
 
         a = time.time()
         dipole_dots = []
+
+        mags = np.sqrt(np.square(dipoles).sum(axis=2, keepdims=True))
+        dipoles = dipoles / mags
+        mags = mags.sum(2)
+
+        dipole_cos = []
+        dipole_sin = []
+        dipole_mags = []
         for frame_ind in xrange(traj.n_frames):
-            temp = []
+            tempdots = []
+            tempcross = []
+            tempmags = []
             for water in xrange(len(oxygens)):
                 water_inds = np.argsort(distances[frame_ind, water])[1:(n_waters + 1)]
-                temp.append(np.dot(dipoles[frame_ind, water], dipoles[frame_ind, water_inds].T))
-                print temp[-1]
-            dipole_dots.append(temp)
+                tempdots.append(np.dot(dipoles[frame_ind, water], dipoles[frame_ind, water_inds].T))
+                tempcross.append(np.array([np.cross(dipoles[frame_ind, water], dipoles[frame_ind, i]) for i in water_inds]))
+                tempmags.append(mags[frame_ind, water_inds])
 
-        dipole_dots = np.array(dipole_dots)
-        Xnew = np.concatenate([Xnew, dipole_dots], axis=2)
+            dipole_cos.append(tempdots)
+            dipole_sin.append(np.sqrt(np.square(tempcross).sum(axis=2)))
+            dipole_mags.append(tempmags)
+
+        dipole_cos = np.array(dipole_cos)
+        dipole_sin = np.array(dipole_sin)
+        dipole_mags = np.array(dipole_mags)
+        Xnew = np.concatenate([Xnew, dipole_mags, dipole_cos, dipole_sin], axis=2)
 
         b = time.time()
 
-        print "distances : %.2f | induced dipoles : %.2f | rotate frame : %.2f | dot products : %.2f" % (distance_time, induced_time, rotate_time, b - a)
+        print "distances : %.2f | induced dipoles : %.2f | rotate frame : %.2f | angle calculation : %.2f" % (distance_time, induced_time, rotate_time, b - a)
 
         return Xnew, distances
 
