@@ -447,50 +447,9 @@ class InducedDipole(BaseEstimator, TransformerMixin):
         self._context = self._sim.context
 
 
-    def transform(self, traj):
+    def _compute_dipoles(self, traj):
+        """compute the dipoles given box vectors and coordinates
         """
-        Transform a trajectory into the dipole features
-
-        Parameters
-        ----------
-        traj : mdtraj.Trajectory
-
-        Returns
-        -------
-        Xnew : np.ndarray
-            sorted distances for each water molecule
-        distances : np.ndarray
-            distances between each water molecule
-        """
-        oxygens = np.array([i for i in xrange(traj.n_atoms) if traj.top.atom(i).element.symbol == 'O'])
-        
-        hydrogens = np.array([[a.index for a in traj.top.atom(Oind).residue.atoms if a.element.symbol == 'H'] for Oind in oxygens])
-        # this ^^^ is the same as that vvv
-        #hydrogens = []
-        #for Oind in oxygens:
-        #    res = traj.top.atom(Oind).residue
-        #    for atom in res.atoms:
-        #        temp = []
-        #        if atom.element.symbol == 'H':
-        #            temp.append(atom.index)
-        #        hydrogens.append(temp)
-        #hydrogens = np.array(hydrogens)
-
-        a = time.time()
-        distances = get_square_distances(traj, oxygens)
-
-        Xnew = copy.copy(distances)
-        Xnew.sort()
-
-        if self.n_waters is None:
-            Xnew = Xnew[:, :, 1:]
-            n_waters = len(oxygens) - 1
-        else:
-            Xnew = Xnew[:, :, 1:(self.n_waters + 1)]
-            n_waters = self.n_waters
-
-        b = time.time()
-        distance_time = b - a
 
         induced_time = 0
         rotate_time = 0
@@ -546,8 +505,58 @@ class InducedDipole(BaseEstimator, TransformerMixin):
 
             alldipoles.append(dipoles)
 
-        dipoles = np.array(alldipoles)
-        print dipoles.shape
+        print "induced dipoles: %.2f | rotations: %.2f" % (induced_time, rotate_time)
+
+        return np.array(alldipoles)
+
+
+    def transform(self, traj):
+        """
+        Transform a trajectory into the dipole features
+
+        Parameters
+        ----------
+        traj : mdtraj.Trajectory
+
+        Returns
+        -------
+        Xnew : np.ndarray
+            sorted distances for each water molecule
+        distances : np.ndarray
+            distances between each water molecule
+        """
+        oxygens = np.array([i for i in xrange(traj.n_atoms) if traj.top.atom(i).element.symbol == 'O'])
+        
+        hydrogens = np.array([[a.index for a in traj.top.atom(Oind).residue.atoms if a.element.symbol == 'H'] for Oind in oxygens])
+        # this ^^^ is the same as that vvv
+        #hydrogens = []
+        #for Oind in oxygens:
+        #    res = traj.top.atom(Oind).residue
+        #    for atom in res.atoms:
+        #        temp = []
+        #        if atom.element.symbol == 'H':
+        #            temp.append(atom.index)
+        #        hydrogens.append(temp)
+        #hydrogens = np.array(hydrogens)
+
+        a = time.time()
+        distances = get_square_distances(traj, oxygens)
+
+        Xnew = copy.copy(distances)
+        Xnew.sort()
+
+        if self.n_waters is None:
+            Xnew = Xnew[:, :, 1:]
+            n_waters = len(oxygens) - 1
+        else:
+            Xnew = Xnew[:, :, 1:(self.n_waters + 1)]
+            n_waters = self.n_waters
+
+        b = time.time()
+        distance_time = b - a
+
+        dipoles = self._compute_dipoles(traj)
+
         # add the dipoles for each atom
         dipoles = dipoles[:, ::3] + dipoles[:, 1::3] + dipoles[:, 2::3]
 
@@ -582,7 +591,7 @@ class InducedDipole(BaseEstimator, TransformerMixin):
 
         b = time.time()
 
-        print "distances : %.2f | induced dipoles : %.2f | rotate frame : %.2f | angle calculation : %.2f" % (distance_time, induced_time, rotate_time, b - a)
+        print "distances : %.2f | angle calculation : %.2f" % (distance_time, b - a)
 
         return Xnew, distances
 
