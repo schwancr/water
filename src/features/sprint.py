@@ -32,5 +32,36 @@ class Sprint(BaseEstimator, TransformerMixin):
     .. math ::
 
         a_{ij} = \frac{1 - (r_{ij} / r0)^n}{1 - (r_{ij} / r0)^m}
-
     """
+    def __init__(self, r0, n=6, m=12):
+        self.r0 = np.float(r0)
+        self.n = np.int(n)
+        self.m = np.int(m)
+
+    def transform(self, traj):
+        """
+        Transform a trajectory into its SPRINT representations
+
+        Parameters
+        ----------
+        traj : mdtraj.Trajectory
+            trajectory containing 
+        """
+        oxygens = np.array([a.index for a in traj.top.atoms if a.element.symbol == 'O'])
+        OOdistances = get_square_distances(traj, oxygens)
+        
+        numer = 1 - np.power(OOdistances / self.r0, self.n)
+        denom = 1 - np.power(OOdistances / self.r0, self.m)
+
+        adjacencies = numer / denom
+
+        all_vals, all_vecs = np.linalg.eig(adjacencies)
+        dec_vals_inds = np.argsort(all_vals, axis=1)
+
+        axis0 = np.arange(all_vals.shape[0])
+        axis1 = np.arange(all_vecs.shape[1])
+
+        all_vals = all_vals[axis0, dec_vals_inds]
+        all_vecs = all_vecs[axis0, axis1, dec_vals_inds]
+
+        return all_vecs, OOdistances
