@@ -2,6 +2,7 @@
 from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
 import mdtraj as md
+from .utils import get_square_distances
 
 class Sprint(BaseEstimator, TransformerMixin):
     r"""
@@ -56,12 +57,20 @@ class Sprint(BaseEstimator, TransformerMixin):
         adjacencies = numer / denom
 
         all_vals, all_vecs = np.linalg.eig(adjacencies)
-        dec_vals_inds = np.argsort(all_vals, axis=1)
+        dec_vals_inds = np.argsort(all_vals, axis=1)[:, ::-1]
 
         axis0 = np.arange(all_vals.shape[0])
         axis1 = np.arange(all_vecs.shape[1])
 
-        all_vals = all_vals[axis0, dec_vals_inds]
-        all_vecs = all_vecs[axis0, axis1, dec_vals_inds]
+        all_vals = all_vals[axis0.reshape((-1, 1)), dec_vals_inds]
+        all_vecs = all_vecs[axis0.reshape((-1, 1, 1)), axis1.reshape((1, -1, 1)), dec_vals_inds.reshape((dec_vals_inds.shape[0], 1, dec_vals_inds.shape[1]))]
+
+        # need to reconcile the changing signs between frames
+        # really these spectral representations are a bit wierd 
+        # to be using...
+        for i in xrange(all_vecs.shape[0]):
+            for j in xrange(all_vecs.shape[2]):
+                sgn = np.sign(all_vecs[i, np.abs(all_vecs[i, :, j]).argmax(), j])
+                all_vecs[i, :, j] *= sgn
 
         return all_vecs, OOdistances

@@ -6,3 +6,4 @@ from .OOH import OOH
 from .hackdipole import Dipole
 from .dipole import InducedDipole
 from .secondorder import SecondOrder
+from .sprint import Sprint

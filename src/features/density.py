@@ -46,6 +46,9 @@ class GridDensity(BaseEstimator, TransformerMixin):
         self.n_pixels = np.int(self.n_pixels)
 
     
-    def _prep_kdes(points, sigma2):
+    def _prep_kde(points, sigma2):
         """
         internal function for setting up the kde's
+        """
+        self._hyd_kde = scipy.stats.gaussian_kde(points.T, 
+        
