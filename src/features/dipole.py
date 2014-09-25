@@ -7,6 +7,8 @@ from simtk import unit
 import time
 import copy
 from .utils import get_square_distances
+from joblib import Parallel, delayed
+
 
 class InducedDipole(BaseEstimator, TransformerMixin):
     """
@@ -20,8 +22,13 @@ class InducedDipole(BaseEstimator, TransformerMixin):
     n_waters : int, optional
         Limit the feature vectors to the closest n_waters. If None, 
         then all waters are included.
+    topology : mdtraj.Topology or openmm.Topology
+        topology to use for calculating dipoles with openmm
+    n_procs : int, optional
+        number of jobs to run in parallel for calculating
+        the induced dipoles
     """
-    def __init__(self, n_waters=None, topology=None):
+    def __init__(self, n_waters=None, topology=None, n_procs=1):
 
         if hasattr(topology, 'to_openmm'):
             self._top = topology.to_openmm()
@@ -33,17 +40,18 @@ class InducedDipole(BaseEstimator, TransformerMixin):
         else:
             self.n_waters = int(n_waters)
 
+        self.n_procs = np.int(n_procs)
+
         forcefield = app.ForceField('iamoeba.xml')
 
         self._top.setUnitCellDimensions([10, 10, 10])
         system = forcefield.createSystem(self._top, nonbondedMethod=app.PME, polarization='direct')
         self._amoeba_force = [f for f in system.getForces() if isinstance(f, mm.openmm.AmoebaMultipoleForce)][0]
-        integrator = mm.LangevinIntegrator(3000*unit.kelvin, 1.0/unit.picoseconds, 2.0*unit.femtoseconds)
-        platform = mm.Platform.getPlatformByName('Reference')
+        integrator = mm.LangevinIntegrator(300*unit.kelvin, 1.0/unit.picoseconds, 2.0*unit.femtoseconds)
+        platform = mm.Platform.getPlatformByName('CPU')
 
         self._sim = app.Simulation(self._top, system, integrator, platform)
         self._context = self._sim.context
-
 
     def _compute_dipoles(self, traj):
         """compute the dipoles given box vectors and coordinates
