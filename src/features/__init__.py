@@ -7,3 +7,4 @@ from .hackdipole import Dipole
 from .dipole import InducedDipole
 from .secondorder import SecondOrder
 from .sprint import Sprint
+from .OOdensity import OOdensity
