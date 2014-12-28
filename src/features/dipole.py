@@ -1,6 +1,6 @@
 import mdtraj as md
 import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base import BaseTransformer
 from simtk.openmm import app
 from simtk import openmm as mm
 from simtk import unit
@@ -10,7 +10,7 @@ from .utils import get_square_distances
 from joblib import Parallel, delayed
 
 
-class InducedDipole(BaseEstimator, TransformerMixin):
+class InducedDipole(BaseTransformer):
     """
     Compute the OO distances and sort them for each water molecule
     Then compute the induced dipole on neighboring waters, and 

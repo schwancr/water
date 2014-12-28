@@ -8,3 +8,5 @@ from .dipole import InducedDipole
 from .secondorder import SecondOrder
 from .sprint import Sprint
 from .OOdensity import OOdensity
+from .orientation import Orientation
+from .OOneighbors import OOneighbors

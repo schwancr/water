@@ -1,11 +1,11 @@
 import numpy as np
 import mdtraj as md
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base import BaseTransformer
 from .utils import get_square_distances
 import copy
 
 
-class SecondOrder(BaseEstimator, TransformerMixin):
+class SecondOrder(BaseTransformer):
     """
     Compute the second order distances in oxygens by including the 
     distances within the solvation shells around a water molecule

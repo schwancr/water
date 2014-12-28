@@ -1,10 +1,10 @@
 import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base import BaseTransformer
 import mdtraj as md
 from .utils import get_square_distances
 import copy
 
-class OH(BaseEstimator, TransformerMixin):
+class OH(BaseTransformer):
     """
     Compute the OO distances and sort them for each water molecule
     

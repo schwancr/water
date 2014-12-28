@@ -1,10 +1,10 @@
 
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base import BaseTransformer
 import numpy as np
 import mdtraj as md
 from .utils import get_square_distances
 
-class Sprint(BaseEstimator, TransformerMixin):
+class Sprint(BaseTransformer):
     r"""
     Use the SPRINT representation from
 

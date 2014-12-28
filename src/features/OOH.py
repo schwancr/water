@@ -1,10 +1,10 @@
 import numpy as np
 import mdtraj as md
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base import BaseTransformer
 from .utils import get_square_distances
 import copy
 
-class OOH(BaseEstimator, TransformerMixin):
+class OOH(BaseTransformer):
     """
     Compute the O-O and O-H distances for every water molecule
 

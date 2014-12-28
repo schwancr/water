@@ -4,7 +4,9 @@ import mdtraj as md
 from .utils import get_square_distances
 import copy
 
-class OO(BaseTransformer):
+import IPython
+
+class OOneighbors(BaseTransformer):
     """
     Compute the OO distances and sort them for each water molecule
     
@@ -46,6 +48,17 @@ class OO(BaseTransformer):
             Xnew = Xnew[:, :, 1:]
         else:
             Xnew = Xnew[:, :, 1:(self.n_waters + 1)]
+
+        sorted_waters = np.argsort(distances, axis=-1)
+        # sorted_waters[t, i, k] contains the k'th closest water index to water i at time t
+        # k==0 is clearly i
+
+        ind0 = np.array([np.arange(Xnew.shape[0])] * Xnew.shape[1]).T
+
+        Xnew0 = copy.copy(Xnew)
+
+        for k in xrange(1, 5):
+            Xnew = np.concatenate([Xnew, Xnew0[ind0, sorted_waters[:, :, k]]], axis=2)
 
         return Xnew, distances
 

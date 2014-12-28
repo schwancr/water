@@ -1,10 +1,10 @@
 import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base import BaseTransformer
 import mdtraj as md
 from .utils import get_square_distances
 import copy
 
-class Dipole(BaseEstimator, TransformerMixin):
+class Dipole(BaseTransformer):
     """
     Compute the OO distances and sort them for each water molecule
     
@@ -62,6 +62,7 @@ class Dipole(BaseEstimator, TransformerMixin):
             Xnew = Xnew[:, :, 1:(self.n_waters + 1)]
             n_waters = self.n_waters
 
+        raise Exception("I'm pretty sure there's a bug here where the line below should do the mean on axis=1")
         dipoles = traj.xyz[:, oxygens, :] - np.mean(traj.xyz[:, hydrogens, :], axis=2)
         dipoles /= np.sqrt(np.square(dipoles).sum(2, keepdims=True)) # make them unit vectors
 

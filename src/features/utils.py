@@ -25,8 +25,6 @@ def get_square_distances(traj, aind=None):
     pairs_ind = np.array([(i, j) for i in xrange(len(aind)) for j in xrange(i + 1, len(aind))])
     pairs = np.array([(aind[i], aind[j]) for i, j in pairs_ind])
 
-    print traj.n_frames
-    print pairs.shape[0]
     distances = md.compute_distances(traj, pairs)
     distances = md.geometry.squareform(distances, pairs_ind)
 

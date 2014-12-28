@@ -1,10 +1,10 @@
 
 import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
+from .base import BaseTranformer
 import mdtraj as md
 
 
-class GridDensity(BaseEstimator, TransformerMixin):
+class GridDensity(BaseTransformer):
     """
     Class for discretizing a KDE around each water molecule. 
     The representation consists of creating a KDE for each
